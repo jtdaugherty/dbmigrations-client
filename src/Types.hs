@@ -5,13 +5,14 @@ module Types
   , uiMode, backend, store, config
   , availableMigrations, installedMigrations
   , migrationList, editMigrationName, editMigrationDeps
-  , initialState
+  , initialState, editingMigration
   )
 where
 
 import Control.Lens (makeLenses)
 
 import Moo.Core
+import Database.Schema.Migrations.Migration (Migration)
 import qualified Database.Schema.Migrations.Backend as B
 import qualified Database.Schema.Migrations.Store as S
 
@@ -38,6 +39,7 @@ data St =
        -- mode: EditMigration
        , _editMigrationName :: Editor
        , _editMigrationDeps :: List (Bool, String)
+       , _editingMigration :: Maybe Migration
        }
 
 makeLenses ''St
@@ -53,4 +55,5 @@ initialState cfg theBackend theStore =
        , _config = cfg
        , _editMigrationName = editor (Name "editMigrationName") (str . unlines) (Just 1) ""
        , _editMigrationDeps = list (Name "editMigrationDeps") (const (str . snd)) []
+       , _editingMigration = Nothing
        }

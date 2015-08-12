@@ -21,6 +21,7 @@ import Data.Text.Zipper
 import Database.Schema.Migrations
   ( createNewMigration
   )
+import Database.Schema.Migrations.Migration (Migration(..))
 import qualified Database.Schema.Migrations.Backend as B
 import qualified Database.Schema.Migrations.Store as S
 
@@ -39,14 +40,28 @@ migrationListingEvent st e =
         EvKey KEsc [] -> halt st
         EvKey KUp [] -> continue $ st & migrationList %~ handleEvent e
         EvKey KDown [] -> continue $ st & migrationList %~ handleEvent e
+        EvKey (KChar 'e') [] -> do
+            case st^.migrationList.listSelectedL of
+                Nothing -> continue st
+                Just i -> do
+                    result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
+                    case result of
+                        Left _ -> continue st
+                        Right m ->
+                            continue $ st & uiMode .~ EditMigration
+                                          & editMigrationName.editContentsL .~ (stringZipper [mId m] $ Just 1)
+                                          & editMigrationDeps .~ migrationDepsList st (mDeps m)
+                                          & editingMigration .~ Just m
         EvKey (KChar 'n') [] -> continue $ st & uiMode .~ EditMigration
                                               & editMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
-                                              & editMigrationDeps .~ migrationDepsList st
+                                              & editMigrationDeps .~ migrationDepsList st []
+                                              & editingMigration .~ Nothing
         _ -> continue st
 
-migrationDepsList :: St -> List (Bool, String)
-migrationDepsList st =
-    list (Name "editMigrationDeps") drawElem ((False, ) <$> st^.availableMigrations)
+migrationDepsList :: St -> [String] -> List (Bool, String)
+migrationDepsList st deps =
+    list (Name "editMigrationDeps") drawElem $ flip map (st^.availableMigrations) $ \m ->
+        (m `elem` deps, m)
     where
         drawElem isSelected (isDep, name) =
             let theAttr = if isSelected then withAttr listSelectedAttr else id
@@ -63,11 +78,19 @@ editMigrationEvent st e =
             Nothing -> continue st
             Just i -> continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
         EvKey KEnter [] -> do
-            status <- liftIO $ createNewMigration (st^.store)
-              (concat $ getEditContents $ st^.editMigrationName)
-              (snd <$> (filter fst $ st^.editMigrationDeps.listElementsL))
+            status <- case st^.editingMigration of
+                Nothing -> liftIO $ createNewMigration (st^.store)
+                    (concat $ getEditContents $ st^.editMigrationName)
+                    (snd <$> (filter fst $ st^.editMigrationDeps.listElementsL))
+                Just m -> do
+                    let updatedM = m { mDeps = snd <$> (filter fst $ st^.editMigrationDeps.listElementsL)
+                                     }
+                    liftIO $ S.saveMigration (st^.store) updatedM
+                    return $ Right updatedM
             continue =<< (reloadMigrations $ st & uiMode .~ MigrationListing)
-        _ -> continue $ st & editMigrationName %~ handleEvent e
+        _ -> case st^.editingMigration of
+            Nothing -> continue st
+            Just _ -> continue $ st & editMigrationName %~ handleEvent e
 
 startEvent :: St -> EventM St
 startEvent = reloadMigrations
