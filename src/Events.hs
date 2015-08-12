@@ -104,8 +104,8 @@ editMigrationEvent st e =
                     return $ Right updatedM
             continue =<< (reloadMigrations $ st & uiMode .~ MigrationListing)
         _ -> case st^.editingMigration of
-            Nothing -> continue st
-            Just _ -> continue $ st & editMigrationName %~ handleEvent e
+            Nothing -> continue $ st & editMigrationName %~ handleEvent e
+            Just _ -> continue st
 
 startEvent :: St -> EventM St
 startEvent = reloadMigrations
