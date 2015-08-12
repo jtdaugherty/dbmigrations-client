@@ -10,6 +10,8 @@ import Data.Monoid
 import Graphics.Vty
 import Moo.Core (Configuration(..))
 
+import Database.Schema.Migrations.Migration (Migration(mId))
+
 import Brick.AttrMap
 import Brick.Util
 import Brick.Widgets.Core
@@ -79,7 +81,9 @@ drawMigrationList st = renderList (st^.migrationList)
 
 drawEditMigrationForm :: St -> Widget
 drawEditMigrationForm st =
-    vBox [ "Name: " <+> renderEditor (st^.editMigrationName)
+    vBox [ "Name: " <+> case st^.editingMigration of
+             Nothing -> renderEditor (st^.editMigrationName)
+             Just m -> str $ mId m
          , hBorderWithLabel "Dependencies"
          , renderList (st^.editMigrationDeps)
          ]
