@@ -65,7 +65,7 @@ footer st = withDefAttr footerAttr $
 help :: St -> Widget
 help st =
     case st^.uiMode of
-        MigrationListing -> "Esc:quit n:new"
+        MigrationListing -> "Esc:quit n:new e:edit"
         EditMigration -> "Esc:quit Spc:toggle dep Enter:save"
 
 drawBody :: St -> Widget
