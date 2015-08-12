@@ -30,7 +30,7 @@ appEvent :: St -> Event -> EventM (Next St)
 appEvent st e =
     case st^.uiMode of
         MigrationListing -> migrationListingEvent st e
-        CreateMigration -> createMigrationEvent st e
+        EditMigration -> editMigrationEvent st e
 
 migrationListingEvent :: St -> Event -> EventM (Next St)
 migrationListingEvent st e =
@@ -39,35 +39,35 @@ migrationListingEvent st e =
         EvKey KEsc [] -> halt st
         EvKey KUp [] -> continue $ st & migrationList %~ handleEvent e
         EvKey KDown [] -> continue $ st & migrationList %~ handleEvent e
-        EvKey (KChar 'n') [] -> continue $ st & uiMode .~ CreateMigration
-                                              & newMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
-                                              & newMigrationDeps .~ migrationDepsList st
+        EvKey (KChar 'n') [] -> continue $ st & uiMode .~ EditMigration
+                                              & editMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
+                                              & editMigrationDeps .~ migrationDepsList st
         _ -> continue st
 
 migrationDepsList :: St -> List (Bool, String)
 migrationDepsList st =
-    list (Name "newMigrationDeps") drawElem ((False, ) <$> st^.availableMigrations)
+    list (Name "editMigrationDeps") drawElem ((False, ) <$> st^.availableMigrations)
     where
         drawElem isSelected (isDep, name) =
             let theAttr = if isSelected then withAttr listSelectedAttr else id
                 d = if isDep then " * " else "   "
             in theAttr $ padRight Max $ d <+> str name
 
-createMigrationEvent :: St -> Event -> EventM (Next St)
-createMigrationEvent st e =
+editMigrationEvent :: St -> Event -> EventM (Next St)
+editMigrationEvent st e =
     case e of
         EvKey KEsc [] -> continue $ st & uiMode .~ MigrationListing
-        EvKey KUp [] -> continue $ st & newMigrationDeps %~ handleEvent e
-        EvKey KDown [] -> continue $ st & newMigrationDeps %~ handleEvent e
-        EvKey (KChar ' ') [] -> case st^.newMigrationDeps.listSelectedL of
+        EvKey KUp [] -> continue $ st & editMigrationDeps %~ handleEvent e
+        EvKey KDown [] -> continue $ st & editMigrationDeps %~ handleEvent e
+        EvKey (KChar ' ') [] -> case st^.editMigrationDeps.listSelectedL of
             Nothing -> continue st
-            Just i -> continue $ st & newMigrationDeps.listElementsL.ix i._1 %~ not
+            Just i -> continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
         EvKey KEnter [] -> do
             status <- liftIO $ createNewMigration (st^.store)
-              (concat $ getEditContents $ st^.newMigrationName)
-              (snd <$> (filter fst $ st^.newMigrationDeps.listElementsL))
+              (concat $ getEditContents $ st^.editMigrationName)
+              (snd <$> (filter fst $ st^.editMigrationDeps.listElementsL))
             continue =<< (reloadMigrations $ st & uiMode .~ MigrationListing)
-        _ -> continue $ st & newMigrationName %~ handleEvent e
+        _ -> continue $ st & editMigrationName %~ handleEvent e
 
 startEvent :: St -> EventM St
 startEvent = reloadMigrations

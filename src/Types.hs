@@ -4,7 +4,7 @@ module Types
   , UIMode(..)
   , uiMode, backend, store, config
   , availableMigrations, installedMigrations
-  , migrationList, newMigrationName, newMigrationDeps
+  , migrationList, editMigrationName, editMigrationDeps
   , initialState
   )
 where
@@ -20,7 +20,7 @@ import Brick.Widgets.Core
 import Brick.Widgets.List
 import Brick.Widgets.Edit
 
-data UIMode = MigrationListing | CreateMigration
+data UIMode = MigrationListing | EditMigration
 
 data St =
     St { _uiMode :: UIMode
@@ -35,9 +35,9 @@ data St =
        -- mode: MigrationListing
        , _migrationList :: List String
 
-       -- mode: CreateMigration
-       , _newMigrationName :: Editor
-       , _newMigrationDeps :: List (Bool, String)
+       -- mode: EditMigration
+       , _editMigrationName :: Editor
+       , _editMigrationDeps :: List (Bool, String)
        }
 
 makeLenses ''St
@@ -51,6 +51,6 @@ initialState cfg theBackend theStore =
        , _installedMigrations = []
        , _migrationList = list (Name "migrationList") (const str) []
        , _config = cfg
-       , _newMigrationName = editor (Name "newMigrationName") (str . unlines) (Just 1) ""
-       , _newMigrationDeps = list (Name "newMigrationDeps") (const (str . snd)) []
+       , _editMigrationName = editor (Name "editMigrationName") (str . unlines) (Just 1) ""
+       , _editMigrationDeps = list (Name "editMigrationDeps") (const (str . snd)) []
        }

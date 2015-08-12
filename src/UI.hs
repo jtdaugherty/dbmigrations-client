@@ -66,20 +66,20 @@ help :: St -> Widget
 help st =
     case st^.uiMode of
         MigrationListing -> "Esc:quit n:new"
-        CreateMigration -> "Esc:quit Spc:toggle dep Enter:create"
+        EditMigration -> "Esc:quit Spc:toggle dep Enter:save"
 
 drawBody :: St -> Widget
 drawBody st =
     case st^.uiMode of
         MigrationListing -> drawMigrationList st
-        CreateMigration -> drawNewMigrationForm st
+        EditMigration -> drawEditMigrationForm st
 
 drawMigrationList :: St -> Widget
 drawMigrationList st = renderList (st^.migrationList)
 
-drawNewMigrationForm :: St -> Widget
-drawNewMigrationForm st =
-    vBox [ "Name: " <+> renderEditor (st^.newMigrationName)
+drawEditMigrationForm :: St -> Widget
+drawEditMigrationForm st =
+    vBox [ "Name: " <+> renderEditor (st^.editMigrationName)
          , hBorderWithLabel "Dependencies"
-         , renderList (st^.newMigrationDeps)
+         , renderList (st^.editMigrationDeps)
          ]
