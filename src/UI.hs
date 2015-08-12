@@ -13,6 +13,7 @@ import Moo.Core (Configuration(..))
 import Brick.AttrMap
 import Brick.Util
 import Brick.Widgets.Core
+import Brick.Widgets.Edit
 import Brick.Widgets.List
 import Brick.Widgets.Border
 import Brick.Widgets.Border.Style
@@ -23,6 +24,8 @@ attributeMap :: AttrMap
 attributeMap = attrMap defAttr
     [ (headerAttr, black `on` green)
     , (footerAttr, black `on` green)
+    , (editAttr,   white `on` blue)
+    , (listSelectedAttr, white `on` blue)
     ]
 
 headerAttr :: AttrName
@@ -37,7 +40,7 @@ drawUI st = [mainUI st]
 mainUI :: St -> Widget
 mainUI st =
     vBox [ header st
-         , drawMigrationList st
+         , drawBody st
          , footer st
          ]
 
@@ -53,14 +56,30 @@ header st = withDefAttr headerAttr $
 footer :: St -> Widget
 footer st = withDefAttr footerAttr $
     hBox [ borderElem bsHorizontal
-         , help
+         , help st
          , hBorder
          , str $ _connectionString $ st^.config
          , borderElem bsHorizontal
          ]
 
-help :: Widget
-help = "q:quit"
+help :: St -> Widget
+help st =
+    case st^.uiMode of
+        MigrationListing -> "Esc:quit n:new"
+        CreateMigration -> "Esc:quit Spc:toggle dep Enter:create"
+
+drawBody :: St -> Widget
+drawBody st =
+    case st^.uiMode of
+        MigrationListing -> drawMigrationList st
+        CreateMigration -> drawNewMigrationForm st
 
 drawMigrationList :: St -> Widget
 drawMigrationList st = renderList (st^.migrationList)
+
+drawNewMigrationForm :: St -> Widget
+drawNewMigrationForm st =
+    vBox [ "Name: " <+> renderEditor (st^.newMigrationName)
+         , hBorderWithLabel "Dependencies"
+         , renderList (st^.newMigrationDeps)
+         ]

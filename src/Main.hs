@@ -10,9 +10,6 @@ import Moo.CommandUtils (makeBackend)
 
 import Graphics.Vty (Event)
 import Brick.Main
-import Brick.Types
-import Brick.Widgets.Core
-import Brick.Widgets.List
 
 import Moo.Core
 
@@ -23,7 +20,7 @@ import Events
 app :: App St Event
 app =
     App { appDraw = drawUI
-        , appChooseCursor = neverShowCursor
+        , appChooseCursor = showFirstCursor
         , appHandleEvent = appEvent
         , appStartEvent = startEvent
         , appAttrMap = const attributeMap
@@ -44,7 +41,4 @@ main = do
     ensureBootstrappedBackend theBackend
     commitBackend theBackend
 
-    let initialState = St theStore theBackend [] []
-                       (list (Name "migrationList") (const str) [])
-                       cfg
-    void $ defaultMain app initialState
+    void $ defaultMain app $ initialState cfg theBackend theStore

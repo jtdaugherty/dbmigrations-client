@@ -25,4 +25,5 @@ executable dbmigrations-client
                        lens,
                        vty,
                        configurator,
-                       mtl
+                       mtl,
+                       text-zipper
