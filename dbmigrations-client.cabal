@@ -23,4 +23,6 @@ executable dbmigrations-client
                        brick,
                        dbmigrations,
                        lens,
-                       vty
+                       vty,
+                       configurator,
+                       mtl

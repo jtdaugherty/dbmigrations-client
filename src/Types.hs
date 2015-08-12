@@ -3,12 +3,19 @@ module Types where
 
 import Control.Lens (makeLenses)
 
-import Database.Schema.Migrations.Backend (Backend)
-import Database.Schema.Migrations.Store (MigrationStore)
+import Moo.Core
+import qualified Database.Schema.Migrations.Backend as B
+import qualified Database.Schema.Migrations.Store as S
+
+import Brick.Widgets.List
 
 data St =
-    St { _store :: MigrationStore
-       , _backend :: Backend
+    St { _store :: S.MigrationStore
+       , _backend :: B.Backend
+       , _availableMigrations :: [String]
+       , _installedMigrations :: [String]
+       , _migrationList :: List String
+       , _config :: Configuration
        }
 
 makeLenses ''St

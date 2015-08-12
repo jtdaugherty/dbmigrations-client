@@ -5,11 +5,15 @@ module UI
   )
 where
 
+import Control.Lens
+import Data.Monoid
 import Graphics.Vty
+import Moo.Core (Configuration(..))
 
 import Brick.AttrMap
 import Brick.Util
 import Brick.Widgets.Core
+import Brick.Widgets.List
 import Brick.Widgets.Border
 import Brick.Widgets.Border.Style
 
@@ -32,21 +36,31 @@ drawUI st = [mainUI st]
 
 mainUI :: St -> Widget
 mainUI st =
-    vBox [ header
-         , migrationList st
-         , footer
+    vBox [ header st
+         , drawMigrationList st
+         , footer st
          ]
 
-header :: Widget
-header = withDefAttr headerAttr $
-    borderElem bsHorizontal <+> "dbmigrations" <+> hBorder
+header :: St -> Widget
+header st = withDefAttr headerAttr $
+    hBox [ borderElem bsHorizontal
+         , "dbmigrations"
+         , hBorder
+         , str $ "Path: " <> (_migrationStorePath $ st^.config)
+         , borderElem bsHorizontal
+         ]
 
-footer :: Widget
-footer = withDefAttr footerAttr $
-    borderElem bsHorizontal <+> help <+> hBorder
+footer :: St -> Widget
+footer st = withDefAttr footerAttr $
+    hBox [ borderElem bsHorizontal
+         , help
+         , hBorder
+         , str $ _connectionString $ st^.config
+         , borderElem bsHorizontal
+         ]
 
 help :: Widget
 help = "q:quit"
 
-migrationList :: St -> Widget
-migrationList st = "migration list" <+> fill ' '
+drawMigrationList :: St -> Widget
+drawMigrationList st = renderList (st^.migrationList)
