@@ -10,6 +10,9 @@ import Control.Applicative ((<$>))
 import Control.Monad.Trans (liftIO)
 import Control.Lens
 import Graphics.Vty
+import System.Process
+import System.Posix.Env (getEnvDefault)
+
 import Brick.Main
 import Brick.Types
 import Brick.Widgets.Core
@@ -56,6 +59,18 @@ migrationListingEvent st e =
                                               & editMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
                                               & editMigrationDeps .~ migrationDepsList st []
                                               & editingMigration .~ Nothing
+        EvKey (KChar 'E') [] -> do
+            case st^.migrationList.listSelectedL of
+                Nothing -> continue st
+                Just i -> do
+                    result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
+                    case result of
+                        Left _ -> continue st
+                        Right m -> suspendAndResume $ do
+                            editorPath <- getEnvDefault "EDITOR" "vi"
+                            path <- S.fullMigrationName (st^.store) (mId m)
+                            callProcess editorPath [path]
+                            return st
         _ -> continue st
 
 migrationDepsList :: St -> [String] -> List (Bool, String)

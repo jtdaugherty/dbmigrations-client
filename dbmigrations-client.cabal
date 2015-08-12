@@ -26,4 +26,6 @@ executable dbmigrations-client
                        vty,
                        configurator,
                        mtl,
-                       text-zipper
+                       text-zipper,
+                       unix,
+                       process
