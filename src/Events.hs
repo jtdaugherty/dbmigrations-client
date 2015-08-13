@@ -7,7 +7,9 @@ module Events
 where
 
 import Control.Applicative ((<$>))
+import Control.Monad (void)
 import Control.Monad.Trans (liftIO)
+import Control.Concurrent (forkIO, writeChan, threadDelay)
 import Control.Lens
 import Data.Monoid
 import Graphics.Vty
@@ -73,10 +75,7 @@ migrationListingEvent st (VtyEvent e) =
                             callProcess editorPath [path]
                             return st
         _ -> continue st
-migrationListingEvent st (ClearStatus msg) =
-    if st^.status == Just msg
-    then continue $ st & status .~ Nothing
-    else continue st
+migrationListingEvent st (ClearStatus msg) = continue $ clearStatus msg st
 
 migrationDepsList :: St -> [String] -> List (Bool, String)
 migrationDepsList st deps =
@@ -101,7 +100,7 @@ editMigrationEvent st (VtyEvent e) =
             Just i -> continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
         EvKey KEnter [] | length (st^.migrationNameL) == 0 -> continue st
         EvKey KEnter [] -> do
-            status <- case st^.editingMigration of
+            result <- case st^.editingMigration of
                 Nothing -> liftIO $ createNewMigration (st^.store)
                     (st^.migrationNameL)
                     (snd <$> (filter fst $ st^.editMigrationDeps.listElementsL))
@@ -110,7 +109,7 @@ editMigrationEvent st (VtyEvent e) =
                                      }
                     liftIO $ S.saveMigration (st^.store) updatedM
                     return $ Right updatedM
-            case status of
+            case result of
                 Left err -> continue =<< setStatus ("Error: " <> err) st
                 Right _ -> continue
                     =<< setStatus "Migration saved."
@@ -118,10 +117,7 @@ editMigrationEvent st (VtyEvent e) =
         _ -> case st^.editingMigration of
             Nothing -> continue $ st & editMigrationName %~ handleEvent e
             Just _ -> continue st
-editMigrationEvent st (ClearStatus msg) =
-    if st^.status == Just msg
-    then continue $ st & status .~ Nothing
-    else continue st
+editMigrationEvent st (ClearStatus msg) = continue $ clearStatus msg st
 
 startEvent :: St -> EventM St
 startEvent = reloadMigrations
@@ -134,3 +130,18 @@ reloadMigrations st = do
     return $ st & installedMigrations .~ installedMs
                 & availableMigrations .~ availableMs
                 & migrationList .~ list (Name "migrationList") (const (padRight Max . str)) availableMs
+
+setStatus :: String -> St -> EventM St
+setStatus msg st = do
+    -- set the status now, fork a thread that clears it later
+    void $ liftIO $ forkIO $ do
+        threadDelay $ 1000000 * 7
+        writeChan (st^.statusChan) (ClearStatus msg)
+
+    return $ st & status .~ Just msg
+
+clearStatus :: String -> St -> St
+clearStatus msg st =
+    if st^.status == Just msg
+    then st & status .~ Nothing
+    else st

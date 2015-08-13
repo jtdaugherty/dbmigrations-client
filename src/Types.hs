@@ -6,15 +6,12 @@ module Types
   , uiMode, backend, store, config
   , availableMigrations, installedMigrations
   , migrationList, editMigrationName, editMigrationDeps
-  , initialState, editingMigration, status
-  , setStatus
+  , initialState, editingMigration, status, statusChan
   )
 where
 
 import Control.Lens
-import Control.Monad (void)
-import Control.Monad.Trans (liftIO)
-import Control.Concurrent (Chan, forkIO, writeChan, threadDelay)
+import Control.Concurrent (Chan)
 import Graphics.Vty (Event)
 
 import Moo.Core
@@ -23,7 +20,6 @@ import qualified Database.Schema.Migrations.Backend as B
 import qualified Database.Schema.Migrations.Store as S
 
 import Brick.Types
-import Brick.Main
 import Brick.Widgets.Core
 import Brick.Widgets.List
 import Brick.Widgets.Edit
@@ -72,12 +68,3 @@ initialState cfg theBackend theStore ch =
        , _status = Nothing
        , _statusChan = ch
        }
-
-setStatus :: String -> St -> EventM St
-setStatus msg st = do
-    -- set the status now, fork a thread that clears it later
-    void $ liftIO $ forkIO $ do
-        threadDelay $ 1000000 * 7
-        writeChan (st^.statusChan) (ClearStatus msg)
-
-    return $ st & status .~ Just msg
