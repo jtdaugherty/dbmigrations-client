@@ -49,10 +49,13 @@ withSelectedMigration st listLens act =
 migrationListingEvent :: St -> AppEvent -> EventM (Next St)
 migrationListingEvent st (VtyEvent e) =
     case e of
+        -- Quit the program
         EvKey (KChar 'q') [] -> halt st
         EvKey KEsc [] -> halt st
+        -- Up and down select migrations
         EvKey KUp [] -> continue $ st & migrationList %~ handleEvent e
         EvKey KDown [] -> continue $ st & migrationList %~ handleEvent e
+        -- Edit a migration inside the program
         EvKey (KChar 'e') [] ->
             withSelectedMigration st migrationList $ \i -> do
                 result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
@@ -63,10 +66,12 @@ migrationListingEvent st (VtyEvent e) =
                                       & editMigrationName.editContentsL .~ (stringZipper [mId m] $ Just 1)
                                       & editMigrationDeps .~ migrationDepsList st (mDeps m)
                                       & editingMigration .~ Just m
+        -- Create a new migration
         EvKey (KChar 'n') [] -> continue $ st & uiMode .~ EditMigration
                                               & editMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
                                               & editMigrationDeps .~ migrationDepsList st []
                                               & editingMigration .~ Nothing
+        -- Spawn an external editor to edit the migration
         EvKey (KChar 'E') [] ->
             withSelectedMigration st migrationList $ \i -> do
                 result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
@@ -94,13 +99,18 @@ editMigrationEvent :: St -> AppEvent -> EventM (Next St)
 editMigrationEvent st (VtyEvent e) =
     let migrationNameL = editMigrationName.to getEditContents.to concat
     in case e of
+        -- Esc takes you back to the migration listing
         EvKey KEsc [] -> continue $ st & uiMode .~ MigrationListing
+        -- Up and down navigate the dependency list
         EvKey KUp [] -> continue $ st & editMigrationDeps %~ handleEvent e
         EvKey KDown [] -> continue $ st & editMigrationDeps %~ handleEvent e
+        -- Toggle the dependency state of the selected dependency
         EvKey (KChar ' ') [] ->
             withSelectedMigration st editMigrationDeps $ \i ->
                 continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
+        -- Ignore enter keypresses if the migration name editor is empty
         EvKey KEnter [] | length (st^.migrationNameL) == 0 -> continue st
+        -- Enter saves the migration being created or modified
         EvKey KEnter [] -> do
             result <- case st^.editingMigration of
                 Nothing -> liftIO $ createNewMigration (st^.store)
@@ -116,6 +126,8 @@ editMigrationEvent st (VtyEvent e) =
                 Right _ -> continue
                     =<< setStatus "Migration saved."
                     =<< (reloadMigrations $ st & uiMode .~ MigrationListing)
+        -- Only honor text input if we are editing a new migration; we
+        -- don't permit the name of existing migrations to be changed
         _ -> case st^.editingMigration of
             Nothing -> continue $ st & editMigrationName %~ handleEvent e
             Just _ -> continue st
