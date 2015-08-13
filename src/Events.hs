@@ -87,7 +87,6 @@ migrationDepsList st deps =
                 d = if isDep then " * " else "   "
             in theAttr $ padRight Max $ d <+> str name
 
-
 editMigrationEvent :: St -> AppEvent -> EventM (Next St)
 editMigrationEvent st (VtyEvent e) =
     let migrationNameL = editMigrationName.to getEditContents.to concat
