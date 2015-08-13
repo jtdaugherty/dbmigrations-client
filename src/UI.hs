@@ -44,6 +44,7 @@ mainUI st =
     vBox [ header st
          , drawBody st
          , footer st
+         , str $ maybe " " id $ st^.status
          ]
 
 header :: St -> Widget

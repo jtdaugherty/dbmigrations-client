@@ -1,6 +1,8 @@
 module Main where
 
 import Control.Monad (void)
+import Control.Concurrent (newChan)
+import Data.Default (def)
 import System.Exit
 
 import Database.Schema.Migrations (ensureBootstrappedBackend)
@@ -8,7 +10,7 @@ import Database.Schema.Migrations.Backend (Backend(..))
 import Database.Schema.Migrations.Filesystem (filesystemStore, FilesystemStoreSettings(..))
 import Moo.CommandUtils (makeBackend)
 
-import Graphics.Vty (Event)
+import Graphics.Vty (mkVty)
 import Brick.Main
 
 import Moo.Core
@@ -17,14 +19,14 @@ import Types
 import UI
 import Events
 
-app :: App St Event
+app :: App St AppEvent
 app =
     App { appDraw = drawUI
         , appChooseCursor = showFirstCursor
         , appHandleEvent = appEvent
         , appStartEvent = startEvent
         , appAttrMap = const attributeMap
-        , appLiftVtyEvent = id
+        , appLiftVtyEvent = VtyEvent
         }
 
 main :: IO ()
@@ -41,4 +43,6 @@ main = do
     ensureBootstrappedBackend theBackend
     commitBackend theBackend
 
-    void $ defaultMain app $ initialState cfg theBackend theStore
+    chan <- newChan
+
+    void $ customMain (mkVty def) chan app $ initialState cfg theBackend theStore chan

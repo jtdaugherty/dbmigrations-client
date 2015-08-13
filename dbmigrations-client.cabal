@@ -28,4 +28,5 @@ executable dbmigrations-client
                        mtl,
                        text-zipper,
                        unix,
-                       process
+                       process,
+                       data-default
