@@ -1,0 +1,12 @@
+UI:
+- Show which migrations have been applied
+- Show dependency tree
+
+Store operations:
+- Delete migration
+
+Backend operations:
+- Test
+- Apply
+- Revert
+- Upgrade
