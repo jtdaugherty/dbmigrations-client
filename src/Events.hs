@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Events
   ( appEvent
@@ -39,6 +40,12 @@ appEvent st e =
         MigrationListing -> migrationListingEvent st e
         EditMigration -> editMigrationEvent st e
 
+withSelectedMigration :: St -> Lens' St (List a) -> (Int -> EventM (Next St)) -> EventM (Next St)
+withSelectedMigration st listLens act =
+    case st^.listLens.listSelectedL of
+        Nothing -> continue st
+        Just i -> act i
+
 migrationListingEvent :: St -> AppEvent -> EventM (Next St)
 migrationListingEvent st (VtyEvent e) =
     case e of
@@ -46,34 +53,30 @@ migrationListingEvent st (VtyEvent e) =
         EvKey KEsc [] -> halt st
         EvKey KUp [] -> continue $ st & migrationList %~ handleEvent e
         EvKey KDown [] -> continue $ st & migrationList %~ handleEvent e
-        EvKey (KChar 'e') [] -> do
-            case st^.migrationList.listSelectedL of
-                Nothing -> continue st
-                Just i -> do
-                    result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
-                    case result of
-                        Left _ -> continue st
-                        Right m ->
-                            continue $ st & uiMode .~ EditMigration
-                                          & editMigrationName.editContentsL .~ (stringZipper [mId m] $ Just 1)
-                                          & editMigrationDeps .~ migrationDepsList st (mDeps m)
-                                          & editingMigration .~ Just m
+        EvKey (KChar 'e') [] ->
+            withSelectedMigration st migrationList $ \i -> do
+                result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
+                case result of
+                    Left _ -> continue st
+                    Right m ->
+                        continue $ st & uiMode .~ EditMigration
+                                      & editMigrationName.editContentsL .~ (stringZipper [mId m] $ Just 1)
+                                      & editMigrationDeps .~ migrationDepsList st (mDeps m)
+                                      & editingMigration .~ Just m
         EvKey (KChar 'n') [] -> continue $ st & uiMode .~ EditMigration
                                               & editMigrationName.editContentsL .~ (stringZipper [] $ Just 1)
                                               & editMigrationDeps .~ migrationDepsList st []
                                               & editingMigration .~ Nothing
-        EvKey (KChar 'E') [] -> do
-            case st^.migrationList.listSelectedL of
-                Nothing -> continue st
-                Just i -> do
-                    result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
-                    case result of
-                        Left _ -> continue st
-                        Right m -> suspendAndResume $ do
-                            editorPath <- getEnvDefault "EDITOR" "vi"
-                            path <- S.fullMigrationName (st^.store) (mId m)
-                            callProcess editorPath [path]
-                            return st
+        EvKey (KChar 'E') [] ->
+            withSelectedMigration st migrationList $ \i -> do
+                result <- liftIO $ S.loadMigration (st^.store) (st^.migrationList.listElementsL.ix i)
+                case result of
+                    Left _ -> continue st
+                    Right m -> suspendAndResume $ do
+                        editorPath <- getEnvDefault "EDITOR" "vi"
+                        path <- S.fullMigrationName (st^.store) (mId m)
+                        callProcess editorPath [path]
+                        return st
         _ -> continue st
 migrationListingEvent st (ClearStatus msg) = continue $ clearStatus msg st
 
@@ -94,9 +97,9 @@ editMigrationEvent st (VtyEvent e) =
         EvKey KEsc [] -> continue $ st & uiMode .~ MigrationListing
         EvKey KUp [] -> continue $ st & editMigrationDeps %~ handleEvent e
         EvKey KDown [] -> continue $ st & editMigrationDeps %~ handleEvent e
-        EvKey (KChar ' ') [] -> case st^.editMigrationDeps.listSelectedL of
-            Nothing -> continue st
-            Just i -> continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
+        EvKey (KChar ' ') [] ->
+            withSelectedMigration st editMigrationDeps $ \i ->
+                continue $ st & editMigrationDeps.listElementsL.ix i._1 %~ not
         EvKey KEnter [] | length (st^.migrationNameL) == 0 -> continue st
         EvKey KEnter [] -> do
             result <- case st^.editingMigration of
