@@ -1,6 +1,7 @@
 UI:
 - Show which migrations have been applied
 - Show dependency tree
+- Provide field for editing migration description
 
 Store operations:
 - Delete migration
