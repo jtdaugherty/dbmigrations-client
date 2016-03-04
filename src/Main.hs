@@ -1,9 +1,11 @@
 module Main where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Concurrent (newChan)
 import Data.Default (def)
 import System.Exit
+import System.Environment
+import System.Console.GetOpt
 
 import Database.Schema.Migrations (ensureBootstrappedBackend)
 import Database.Schema.Migrations.Backend (Backend(..))
@@ -29,9 +31,46 @@ app =
         , appLiftVtyEvent = VtyEvent
         }
 
+data Arg = Help
+         | ConfigFile FilePath
+           deriving (Eq, Show)
+
+data ArgConfig =
+    ArgConfig { argConfigFile :: Maybe FilePath
+              }
+
+defaultArgConfig :: ArgConfig
+defaultArgConfig =
+    ArgConfig { argConfigFile = Nothing
+              }
+
+opts :: [OptDescr Arg]
+opts =
+    [ Option "h" ["help"] (NoArg Help) "This help output"
+    , Option "c" ["config-file"] (ReqArg ConfigFile "PATH")
+      ("Path to the moo config file to use (default: use only environment variables)")
+    ]
+
+updateConfig :: ArgConfig -> Arg -> ArgConfig
+updateConfig c Help = c
+updateConfig c (ConfigFile f) = c { argConfigFile = Just f }
+
+usage :: IO a
+usage = do
+  pn <- getProgName
+  let header = "Usage: " ++ pn ++ " [options]"
+  putStrLn $ usageInfo header opts
+  exitFailure
+
 main :: IO ()
 main = do
-    result <- loadConfiguration Nothing
+    args <- getArgs
+    let (os, _, _) = getOpt Permute opts args
+        argCfg = foldl updateConfig defaultArgConfig os
+
+    when (Help `elem` os) usage
+
+    result <- loadConfiguration $ argConfigFile argCfg
     cfg <- case result of
         Left e -> putStrLn e >> exitFailure
         Right c -> return c
