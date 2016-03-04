@@ -12,6 +12,7 @@ where
 
 import Control.Lens
 import Control.Concurrent (Chan)
+import Data.Monoid
 import Graphics.Vty (Event)
 
 import Moo.Core
@@ -60,10 +61,10 @@ initialState cfg theBackend theStore ch =
        , _store = theStore
        , _availableMigrations = []
        , _installedMigrations = []
-       , _migrationList = list (Name "migrationList") (const str) []
+       , _migrationList = list (Name "migrationList") mempty 1
        , _config = cfg
        , _editMigrationName = editor (Name "editMigrationName") (str . unlines) (Just 1) ""
-       , _editMigrationDeps = list (Name "editMigrationDeps") (const (str . snd)) []
+       , _editMigrationDeps = list (Name "editMigrationDeps") mempty 1
        , _editingMigration = Nothing
        , _status = Nothing
        , _statusChan = ch

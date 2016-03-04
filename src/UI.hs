@@ -5,20 +5,25 @@ module UI
   )
 where
 
+import Control.Applicative
 import Control.Lens
+import Data.List (intersperse)
 import Data.Monoid
 import Graphics.Vty
 import Moo.Core (Configuration(..))
 
 import Database.Schema.Migrations.Migration (Migration(mId))
 
+import Brick.Types (Widget, Padding(..))
 import Brick.AttrMap
 import Brick.Util
+import Brick.Markup
 import Brick.Widgets.Core
 import Brick.Widgets.Edit
 import Brick.Widgets.List
 import Brick.Widgets.Border
 import Brick.Widgets.Border.Style
+import Data.Text.Markup (fromText)
 
 import Types
 
@@ -28,10 +33,14 @@ attributeMap = attrMap defAttr
     , (footerAttr, black `on` green)
     , (editAttr,   white `on` blue)
     , (listSelectedAttr, white `on` blue)
+    , (keyAttr,    fg white)
     ]
 
 headerAttr :: AttrName
 headerAttr = "header"
+
+keyAttr :: AttrName
+keyAttr = "keybinding"
 
 footerAttr :: AttrName
 footerAttr = "footer"
@@ -50,7 +59,7 @@ mainUI st =
 header :: St -> Widget
 header st = withDefAttr headerAttr $
     hBox [ borderElem bsHorizontal
-         , "dbmigrations"
+         , str "dbmigrations"
          , hBorder
          , str $ "Path: " <> (_migrationStorePath $ st^.config)
          , borderElem bsHorizontal
@@ -67,9 +76,18 @@ footer st = withDefAttr footerAttr $
 
 help :: St -> Widget
 help st =
-    case st^.uiMode of
-        MigrationListing -> "Esc:quit n:new e:edit"
-        EditMigration -> "Esc:quit Spc:toggle dep Enter:save"
+    let mkPair (k, desc) = (k @? keyAttr) <> (fromText $ ":" <> desc)
+        pairs = case st^.uiMode of
+          MigrationListing -> [ ("Esc", "quit")
+                              , ("n", "new")
+                              , ("e", "edit")
+                              , ("E", "edit-raw")
+                              ]
+          EditMigration -> [ ("Esc", "cancel")
+                           , ("Space", "toggle-dep")
+                           , ("Enter", "save")
+                           ]
+    in markup $ mconcat $ intersperse " " $ mkPair <$> pairs
 
 drawBody :: St -> Widget
 drawBody st =
@@ -78,13 +96,19 @@ drawBody st =
         EditMigration -> drawEditMigrationForm st
 
 drawMigrationList :: St -> Widget
-drawMigrationList st = renderList (st^.migrationList)
+drawMigrationList st = renderList (st^.migrationList) $ (const (padRight Max . str))
 
 drawEditMigrationForm :: St -> Widget
 drawEditMigrationForm st =
-    vBox [ "Name: " <+> case st^.editingMigration of
+    vBox [ str "Name: " <+> case st^.editingMigration of
              Nothing -> renderEditor (st^.editMigrationName)
              Just m -> str $ mId m
-         , hBorderWithLabel "Dependencies"
-         , renderList (st^.editMigrationDeps)
+         , hBorderWithLabel $ str "Dependencies"
+         , renderList (st^.editMigrationDeps) drawMigrationDepListElem
          ]
+
+drawMigrationDepListElem :: Bool -> (Bool, String) -> Widget
+drawMigrationDepListElem isSelected (isDep, name) =
+    let theAttr = if isSelected then withAttr listSelectedAttr else id
+        d = str $ if isDep then " * " else "   "
+    in theAttr $ padRight Max $ d <+> str name

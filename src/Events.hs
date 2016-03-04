@@ -12,6 +12,7 @@ import Control.Monad (void)
 import Control.Monad.Trans (liftIO)
 import Control.Concurrent (forkIO, writeChan, threadDelay)
 import Control.Lens
+import qualified Data.Vector as V
 import Data.Monoid
 import Graphics.Vty
 import System.Process
@@ -19,7 +20,6 @@ import System.Posix.Env (getEnvDefault)
 
 import Brick.Main
 import Brick.Types
-import Brick.Widgets.Core
 import Brick.Widgets.List
 import Brick.Widgets.Edit
 
@@ -28,7 +28,7 @@ import Data.Text.Zipper
 import Database.Schema.Migrations
   ( createNewMigration
   )
-import Database.Schema.Migrations.Migration (Migration(..))
+import Database.Schema.Migrations.Migration (Migration(..), newMigration)
 import qualified Database.Schema.Migrations.Backend as B
 import qualified Database.Schema.Migrations.Store as S
 
@@ -53,8 +53,8 @@ migrationListingEvent st (VtyEvent e) =
         EvKey (KChar 'q') [] -> halt st
         EvKey KEsc [] -> halt st
         -- Up and down select migrations
-        EvKey KUp [] -> continue $ st & migrationList %~ handleEvent e
-        EvKey KDown [] -> continue $ st & migrationList %~ handleEvent e
+        EvKey KUp [] -> continue =<< handleEventLensed st migrationList e
+        EvKey KDown [] -> continue =<< handleEventLensed st migrationList e
         -- Edit a migration inside the program
         EvKey (KChar 'e') [] ->
             withSelectedMigration st migrationList $ \i -> do
@@ -87,13 +87,9 @@ migrationListingEvent st (ClearStatus msg) = continue $ clearStatus msg st
 
 migrationDepsList :: St -> [String] -> List (Bool, String)
 migrationDepsList st deps =
-    list (Name "editMigrationDeps") drawElem $ flip map (st^.availableMigrations) $ \m ->
-        (m `elem` deps, m)
+    list (Name "editMigrationDeps") depElems 1
     where
-        drawElem isSelected (isDep, name) =
-            let theAttr = if isSelected then withAttr listSelectedAttr else id
-                d = if isDep then " * " else "   "
-            in theAttr $ padRight Max $ d <+> str name
+        depElems = V.fromList $ flip map (st^.availableMigrations) $ \m -> (m `elem` deps, m)
 
 editMigrationEvent :: St -> AppEvent -> EventM (Next St)
 editMigrationEvent st (VtyEvent e) =
@@ -102,8 +98,8 @@ editMigrationEvent st (VtyEvent e) =
         -- Esc takes you back to the migration listing
         EvKey KEsc [] -> continue $ st & uiMode .~ MigrationListing
         -- Up and down navigate the dependency list
-        EvKey KUp [] -> continue $ st & editMigrationDeps %~ handleEvent e
-        EvKey KDown [] -> continue $ st & editMigrationDeps %~ handleEvent e
+        EvKey KUp [] -> continue =<< handleEventLensed st editMigrationDeps e
+        EvKey KDown [] -> continue =<< handleEventLensed st editMigrationDeps e
         -- Toggle the dependency state of the selected dependency
         EvKey (KChar ' ') [] ->
             withSelectedMigration st editMigrationDeps $ \i ->
@@ -113,11 +109,13 @@ editMigrationEvent st (VtyEvent e) =
         -- Enter saves the migration being created or modified
         EvKey KEnter [] -> do
             result <- case st^.editingMigration of
-                Nothing -> liftIO $ createNewMigration (st^.store)
-                    (st^.migrationNameL)
-                    (snd <$> (filter fst $ st^.editMigrationDeps.listElementsL))
+                Nothing -> do
+                    let newM = (newMigration (st^.migrationNameL))
+                          { mDeps = snd <$> (filter fst $ V.toList $ st^.editMigrationDeps.listElementsL)
+                          }
+                    liftIO $ createNewMigration (st^.store) newM
                 Just m -> do
-                    let updatedM = m { mDeps = snd <$> (filter fst $ st^.editMigrationDeps.listElementsL)
+                    let updatedM = m { mDeps = snd <$> (filter fst $ V.toList $ st^.editMigrationDeps.listElementsL)
                                      }
                     liftIO $ S.saveMigration (st^.store) updatedM
                     return $ Right updatedM
@@ -129,7 +127,7 @@ editMigrationEvent st (VtyEvent e) =
         -- Only honor text input if we are editing a new migration; we
         -- don't permit the name of existing migrations to be changed
         _ -> case st^.editingMigration of
-            Nothing -> continue $ st & editMigrationName %~ handleEvent e
+            Nothing -> continue =<< handleEventLensed st editMigrationName e
             Just _ -> continue st
 editMigrationEvent st (ClearStatus msg) = continue $ clearStatus msg st
 
@@ -143,7 +141,7 @@ reloadMigrations st = do
 
     return $ st & installedMigrations .~ installedMs
                 & availableMigrations .~ availableMs
-                & migrationList .~ list (Name "migrationList") (const (padRight Max . str)) availableMs
+                & migrationList .~ list (Name "migrationList") (V.fromList availableMs) 1
 
 setStatus :: String -> St -> EventM St
 setStatus msg st = do
